@@ -9,11 +9,8 @@ module ODBCAdapter
     # Returns the number of rows affected.
     def execute(sql, name = nil, binds = [])
       log(sql, name) do
-        if prepared_statements
-          @connection.do(sql, *prepared_binds(binds))
-        else
-          @connection.do(sql)
-        end
+        sql = bind_params(binds, sql) if prepared_statements
+        @connection.do(sql)
       end
     end
 
@@ -22,12 +19,8 @@ module ODBCAdapter
     # the executed +sql+ statement.
     def exec_query(sql, name = 'SQL', binds = [], prepare: false) # rubocop:disable Lint/UnusedMethodArgument
       log(sql, name) do
-        stmt =
-          if prepared_statements
-            @connection.run(sql, *prepared_binds(binds))
-          else
-            @connection.run(sql)
-          end
+        sql = bind_params(binds, sql) if prepared_statements
+        stmt =  @connection.run(sql)
 
         columns = stmt.columns
         values  = stmt.to_a
@@ -72,13 +65,74 @@ module ODBCAdapter
       "#{table}_seq"
     end
 
+    def empty_insert_statement_value(primary_key = nil)
+      "(#{primary_key}) VALUES (DEFAULT)"
+    end
+
     private
 
     # A custom hook to allow end users to overwrite the type casting before it
     # is returned to ActiveRecord. Useful before a full adapter has made its way
     # back into this repository.
-    def dbms_type_cast(_columns, values)
-      values
+    def dbms_type_cast(columns, rows)
+      # Cast the values to the correct type
+      columns.each_with_index do |column, col_index|
+        #puts "  #{column.name}   type #{column.type}  length #{column.length}   nullable #{column.nullable}   scale #{column.scale}   precision #{column.precision}   searchable #{column.searchable}   unsigned #{column.unsigned}"
+        rows.each do |row|
+          value = row[col_index]
+
+          new_value = case
+                      when value.nil?
+                        nil
+                      when [ODBC::SQL_CHAR, ODBC::SQL_VARCHAR, ODBC::SQL_LONGVARCHAR].include?(column.type)
+                        # Do nothing, because the data defaults to strings
+                        # This also covers null values, as they are VARCHARs of length 0
+                        value.is_a?(String) ? value.force_encoding("UTF-8") : value
+                      when [ODBC::SQL_DECIMAL, ODBC::SQL_NUMERIC].include?(column.type)
+                        column.scale == 0 ? value.to_i : value.to_f
+                      when [ODBC::SQL_REAL, ODBC::SQL_FLOAT, ODBC::SQL_DOUBLE].include?(column.type)
+                        value.to_f
+                      when [ODBC::SQL_INTEGER, ODBC::SQL_SMALLINT, ODBC::SQL_TINYINT, ODBC::SQL_BIGINT].include?(column.type)
+                        value.to_i
+                      when [ODBC::SQL_BIT].include?(column.type)
+                        value == 1
+                      when [ODBC::SQL_DATE, ODBC::SQL_TYPE_DATE].include?(column.type)
+                        value.to_date
+                      when [ODBC::SQL_TIME, ODBC::SQL_TYPE_TIME].include?(column.type)
+                        value.to_time
+                      when [ODBC::SQL_DATETIME, ODBC::SQL_TIMESTAMP, ODBC::SQL_TYPE_TIMESTAMP].include?(column.type)
+                        value.to_datetime
+                      # when ["ARRAY"?, "OBJECT"?, "VARIANT"?].include?(column.type)
+                        # TODO: "ARRAY", "OBJECT", "VARIANT" all return as VARCHAR
+                        # so we'd need to parse them to make them the correct type
+
+                        # As of now, we are just going to return the value as a string
+                        # and let the consumer handle it.  In the future, we could handle
+                        # if here, but there's not a good way to tell what the type is
+                        # without trying to parse the value as JSON as see if it works
+                        # JSON.parse(value)
+                      when [ODBC::SQL_BINARY].include?(column.type)
+                        # These don't actually ever seem to return, even though they are
+                        # defined in the ODBC driver, but I left them in here just in case
+                        # so that future us can see what they should be
+                        value
+                      else
+                        # the use of @connection.types() results in a "was not dropped before garbage collection" warning.
+                        raise "Unknown column type: #{column.type}  #{@connection.types(column.type).first[0]}"
+                      end
+
+          row[col_index] = new_value
+        end
+      end
+      rows
+    end
+
+    def bind_params(binds, sql)
+      prepared_binds = *prepared_binds(binds)
+      prepared_binds.each.with_index(1) do |val, ind|
+        sql = sql.gsub("$#{ind}", "'#{val}'")
+      end
+      sql
     end
 
     # Assume received identifier is in DBMS's data dictionary case.
@@ -127,8 +181,13 @@ module ODBCAdapter
       col_name == 'id' ? false : result
     end
 
+    # Adapt to Rails 5.2
+    def prepare_statement_sub(sql)
+      sql.gsub(/\$\d+/, '?')
+    end
+
     def prepared_binds(binds)
-      prepare_binds_for_database(binds).map { |bind| _type_cast(bind) }
+      binds.map(&:value_for_database).map { |bind| _type_cast(bind) }
     end
   end
 end

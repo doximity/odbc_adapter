@@ -3,14 +3,17 @@ module ODBCAdapter
     # Overrides specific to PostgreSQL. Mostly taken from
     # ActiveRecord::ConnectionAdapters::PostgreSQLAdapter
     class PostgreSQLODBCAdapter < ActiveRecord::ConnectionAdapters::ODBCAdapter
-      BOOLEAN_TYPE = 'bool'.freeze
+      BOOLEAN_TYPE = 'boolean'.freeze
       PRIMARY_KEY  = 'SERIAL PRIMARY KEY'.freeze
+      VARIANT_TYPE = 'VARIANT'.freeze
+      DATE_TYPE = 'DATE'.freeze
+      JSON_TYPE = 'JSON'.freeze
 
       alias create insert
 
       # Override to handle booleans appropriately
       def native_database_types
-        @native_database_types ||= super.merge(boolean: { name: 'bool' })
+        @native_database_types ||= super.merge(boolean: { name: 'boolean' })
       end
 
       def arel_visitor
@@ -35,7 +38,7 @@ module ODBCAdapter
         "#{table_name}_#{pk || 'id'}_seq"
       end
 
-      def sql_for_insert(sql, pk, _id_value, _sequence_name, binds)
+      def sql_for_insert(sql, pk, binds)
         unless pk
           table_ref = extract_table_ref_from_insert_sql(sql)
           pk = primary_key(table_ref) if table_ref
