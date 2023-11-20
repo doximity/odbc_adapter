@@ -178,17 +178,17 @@ module ActiveRecord
 
       # Translate an exception from the native DBMS to something usable by
       # ActiveRecord.
-      def translate_exception(exception, message)
+      def translate_exception(exception, **kwargs)
         error_number = exception.message[/^\d+/].to_i
 
         if error_number == ERR_DUPLICATE_KEY_VALUE
-          ActiveRecord::RecordNotUnique.new(message, exception)
+          ActiveRecord::RecordNotUnique.new(kwargs, exception)
         elsif error_number == ERR_QUERY_TIMED_OUT || exception.message =~ ERR_QUERY_TIMED_OUT_MESSAGE
-          ::ODBCAdapter::QueryTimeoutError.new(message, exception)
+          ::ODBCAdapter::QueryTimeoutError.new(kwargs, exception)
         elsif exception.message.match(ERR_CONNECTION_FAILED_REGEX) || exception.message =~ ERR_CONNECTION_FAILED_MESSAGE
           begin
             reconnect!
-            ::ODBCAdapter::ConnectionFailedError.new(message, exception)
+            ::ODBCAdapter::ConnectionFailedError.new(kwargs, exception)
           rescue => e
             puts "unable to reconnect #{e}"
           end
