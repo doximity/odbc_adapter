@@ -193,7 +193,7 @@ module ODBCAdapter
     end
 
     def current_schema
-      @config[:driver].attrs['schema']
+      @config[:driver].attrs.transform_keys(&:downcase)['schema']
     end
 
     def name_regex(name)
