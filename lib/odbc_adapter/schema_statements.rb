@@ -10,18 +10,21 @@ module ODBCAdapter
     # Returns an array of table names, for database tables visible on the
     # current connection.
     def tables(_name = nil)
-      stmt   = @raw_connection.tables
-      result = stmt.fetch_all || []
-      stmt.drop
-
+      table_names = []
       db_regex = name_regex(current_database)
       schema_regex = name_regex(current_schema)
-      result.each_with_object([]) do |row, table_names|
-        next unless row[0] =~ db_regex && row[1] =~ schema_regex
-        schema_name, table_name, table_type = row[1..3]
-        next if respond_to?(:table_filtered?) && table_filtered?(schema_name, table_type)
-        table_names << format_case(table_name)
+      stmt = @raw_connection.prepare("SHOW TABLES IN ACCOUNT")
+
+      stmt.execute.each_hash do |row|
+        next unless row["database_name"] =~ db_regex && row["schema_name"] =~ schema_regex
+        next if respond_to?(:table_filtered?) && table_filtered?(row["schema_name"], row["kind"])
+
+        table_names << format_case(row["name"])
       end
+
+      table_names
+    ensure
+      stmt.drop
     end
 
     # Returns an array of view names defined in the database.
