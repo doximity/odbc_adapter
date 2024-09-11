@@ -10,28 +10,42 @@ module ODBCAdapter
     # Returns an array of table names, for database tables visible on the
     # current connection.
     def tables(_name = nil)
-      stmt   = @connection.tables
-      result = stmt.fetch_all || []
-      stmt.drop
-
+      table_names = []
       db_regex = name_regex(current_database)
       schema_regex = name_regex(current_schema)
-      result.each_with_object([]) do |row, table_names|
-        next unless row[0] =~ db_regex && row[1] =~ schema_regex
-        schema_name, table_name, table_type = row[1..3]
-        next if respond_to?(:table_filtered?) && table_filtered?(schema_name, table_type)
-        table_names << format_case(table_name)
+      stmt = @raw_connection.prepare("SHOW TABLES IN ACCOUNT")
+
+      stmt.execute.each_hash do |row|
+        next unless row["database_name"] =~ db_regex && row["schema_name"] =~ schema_regex
+        next if respond_to?(:table_filtered?) && table_filtered?(row["schema_name"], row["kind"])
+
+        table_names << format_case(row["name"])
       end
+
+      table_names
+    ensure
+      stmt.drop
     end
 
     # Returns an array of view names defined in the database.
     def views
-      []
+      views_query = "SHOW VIEWS IN SCHEMA #{current_database}.#{current_schema}"
+
+      # Temporarily disable debug logging
+      query_results = ActiveRecord::Base.logger.silence do
+        begin
+          exec_query(views_query)
+        rescue ODBC_UTF8::Error
+          []
+        end
+      end
+
+      query_results.map { |query_result| format_case(query_result["name"]) }
     end
 
     # Returns an array of indexes for the given table.
     def indexes(table_name, _name = nil)
-      stmt   = @connection.indexes(native_case(table_name.to_s))
+      stmt   = @raw_connection.indexes(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop unless stmt.nil?
 
@@ -78,7 +92,8 @@ module ODBCAdapter
           col_native_type: extract_data_type_from_snowflake(data_type_parsed["type"]),
           column_size: extract_column_size_from_snowflake(data_type_parsed),
           numeric_scale: extract_scale_from_snowflake(data_type_parsed),
-          is_nullable: data_type_parsed["nullable"]
+          is_nullable: data_type_parsed["nullable"],
+          auto_incremented: query_result["autoincrement"] != ""
         }
       end
 
@@ -99,6 +114,7 @@ module ODBCAdapter
         col_limit       = col[:column_size]
         col_scale       = col[:numeric_scale]
         col_nullable    = col[:is_nullable]
+        auto_incremented = col[:auto_incremented]
 
         args = { sql_type: construct_sql_type(col_native_type, col_limit, col_scale), type: col_native_type, limit: col_limit }
         args[:type] = case col_native_type
@@ -126,13 +142,13 @@ module ODBCAdapter
 
         sql_type_metadata = ActiveRecord::ConnectionAdapters::SqlTypeMetadata.new(**args)
 
-        cols << new_column(format_case(col_name), col_default, sql_type_metadata, col_nullable, col_native_type)
+        cols << new_column(format_case(col_name), col_default, sql_type_metadata, col_nullable, col_native_type, auto_incremented)
       end
     end
 
     # Returns just a table's primary key
     def primary_key(table_name)
-      stmt   = @connection.primary_keys(native_case(table_name.to_s))
+      stmt   = @raw_connection.primary_keys(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop unless stmt.nil?
 
@@ -142,7 +158,7 @@ module ODBCAdapter
     end
 
     def foreign_keys(table_name)
-      stmt   = @connection.foreign_keys(native_case(table_name.to_s))
+      stmt   = @raw_connection.foreign_keys(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop unless stmt.nil?
 
@@ -177,7 +193,7 @@ module ODBCAdapter
     end
 
     def current_schema
-      @config[:driver].attrs['schema']
+      @config[:driver].attrs.transform_keys(&:downcase)['schema']
     end
 
     def name_regex(name)
