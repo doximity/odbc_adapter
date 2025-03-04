@@ -11,7 +11,6 @@ module ODBCAdapter
       # sent to the DBMS (to attempt to get as much coverage as possible for
       # DBMSs we don't support).
       def arel_visitor
-        Arel::Visitors::PostgreSQL.new(self)
       end
 
       # Explicitly turning off prepared_statements in the null adapter because
