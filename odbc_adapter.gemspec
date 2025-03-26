@@ -28,4 +28,19 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'rubocop', '0.48.1'
   spec.add_development_dependency 'simplecov', '~> 0.14'
   spec.add_development_dependency 'pry', '~> 0.11.1'
+
+  spec.post_install_message = <<~MESSAGE
+    == doximity/odbc_adapter ==
+
+    If your project is already at or above Rails 7.2, and you are using the
+    odbc_adapter to connect to Snowflake, please make sure to change the adapter
+    name in your config/database.yml to snowflake_odbc.
+
+    Example,
+
+    snowflake_default: &snowflake_default
+      adapter: snowflake_odbc
+      conn_str: <%= ENV.fetch("SNOWFLAKE_CONNECTION", nil) %>
+
+  MESSAGE
 end
