@@ -2,6 +2,7 @@ require 'active_record'
 require 'odbc'
 require 'odbc_utf8'
 
+require 'odbc_adapter/connection_setup'
 require 'odbc_adapter/database_limits'
 require 'odbc_adapter/database_statements'
 require 'odbc_adapter/error'
@@ -20,50 +21,14 @@ require 'odbc_adapter/concerns/concern'
 module ActiveRecord
   class Base
     class << self
+      # NOTE: This is only used by ActiveRecord 7.1, and became deprecated in 7.2.
       # Build a new ODBC connection with the given configuration.
       def odbc_connection(config)
-        config = config.symbolize_keys
+        setup = ::ODBCAdapter::ConnectionSetup.new(config.symbolize_keys)
+        setup.build
 
-        connection, config =
-          if config.key?(:dsn)
-            odbc_dsn_connection(config)
-          elsif config.key?(:conn_str)
-            odbc_conn_str_connection(config)
-          else
-            raise ArgumentError, 'No data source name (:dsn) or connection string (:conn_str) specified.'
-          end
-
-        database_metadata = ::ODBCAdapter::DatabaseMetadata.new(connection, config[:encoding_bug])
-        database_metadata.adapter_class.new(connection, logger, config, database_metadata)
-      end
-
-      private
-
-      # Connect using a predefined DSN.
-      def odbc_dsn_connection(config)
-        username   = config[:username] ? config[:username].to_s : nil
-        password   = config[:password] ? config[:password].to_s : nil
-        odbc_module = config[:encoding] == 'utf8' ? ODBC_UTF8 : ODBC
-        connection = odbc_module.connect(config[:dsn], username, password)
-
-        # encoding_bug indicates that the driver is using non ASCII and has the issue referenced here https://github.com/larskanis/ruby-odbc/issues/2
-        [connection, config.merge(username: username, password: password, encoding_bug: config[:encoding] == 'utf8')]
-      end
-
-      # Connect using ODBC connection string
-      # Supports DSN-based or DSN-less connections
-      # e.g. "DSN=virt5;UID=rails;PWD=rails"
-      #      "DRIVER={OpenLink Virtuoso};HOST=carlmbp;UID=rails;PWD=rails"
-      def odbc_conn_str_connection(config)
-        attrs = config[:conn_str].split(';').map { |option| option.split('=', 2) }.to_h
-        odbc_module = attrs['ENCODING'] == 'utf8' ? ODBC_UTF8 : ODBC
-        driver = odbc_module::Driver.new
-        driver.name = 'odbc'
-        driver.attrs = attrs
-
-        connection = odbc_module::Database.new.drvconnect(driver)
-        # encoding_bug indicates that the driver is using non ASCII and has the issue referenced here https://github.com/larskanis/ruby-odbc/issues/2
-        [connection, config.merge(driver: driver, encoding: attrs['ENCODING'], encoding_bug: attrs['ENCODING'] == 'utf8')]
+        database_metadata = ::ODBCAdapter::DatabaseMetadata.new(setup.connection, setup.config[:encoding_bug])
+        database_metadata.adapter_class.new(setup.connection, logger, nil, setup.config, database_metadata)
       end
     end
   end
@@ -91,11 +56,32 @@ module ActiveRecord
       # when a connection is first established.
       attr_reader :database_metadata
 
-      def initialize(connection, logger, config, database_metadata)
-        configure_time_options(connection)
-        super(connection, logger, config)
-        @database_metadata = database_metadata
-        @raw_connection = connection
+      def initialize(config_or_deprecated_connection, logger = nil, connection_options = nil, config = nil, database_metadata = nil)
+        super(config_or_deprecated_connection, logger, connection_options, config)
+
+        if config_or_deprecated_connection.try(:get_info, ODBC.const_get("SQL_DBMS_NAME"))
+          # On Rails 7.1 `config_or_deprecated_connection` will be connection that is setup above, in this file,
+          # in `ActiveRecord::Base.odbc_connection`.
+          @raw_connection = config_or_deprecated_connection
+          @config = connection_options
+          @database_metadata = database_metadata
+          configure_time_options(@raw_connection)
+        else
+          # On Rails 7.2, ActiveRecord will instantiate this class and pass the connection string in
+          # `config_or_deprecated_connection`, therefore we need to setup the connection, very similar to what
+          # is done above in `ActiveRecord::Base.odbc_connection` (which is used in Rails 7.1).
+          setup = ::ODBCAdapter::ConnectionSetup.new(config_or_deprecated_connection.symbolize_keys)
+          setup.build
+
+          @config = setup.config
+          # TODO: `ODBCAdapter::ConnectionSetup#build` establishes a connection, and calling `#connect` will
+          # reconnect again. We could instead call
+          #   @raw_connection = setup.connection
+          #   configure_time_options(@raw_connection)
+          connect
+
+          @database_metadata = ::ODBCAdapter::DatabaseMetadata.new(@raw_connection, @config[:encoding_bug])
+        end
       end
 
       # Returns the human-readable name of the adapter.
@@ -123,10 +109,7 @@ module ActiveRecord
         @raw_connection.connected?
       end
 
-      # Disconnects from the database if already connected, and establishes a
-      # new connection with the database.
-      def reconnect
-        disconnect!
+      def connect
         odbc_module = @config[:encoding] == 'utf8' ? ODBC_UTF8 : ODBC
         @raw_connection =
           if @config.key?(:dsn)
@@ -135,6 +118,13 @@ module ActiveRecord
             odbc_module::Database.new.drvconnect(@config[:driver])
           end
         configure_time_options(@raw_connection)
+      end
+
+      # Disconnects from the database if already connected, and establishes a
+      # new connection with the database.
+      def reconnect
+        disconnect!
+        connect
       end
       alias reset! reconnect!
 
