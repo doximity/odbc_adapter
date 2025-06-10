@@ -56,15 +56,15 @@ module ActiveRecord
       # when a connection is first established.
       attr_reader :database_metadata
 
-      def initialize(config_or_deprecated_connection, logger = nil, connection_options = nil, config = nil, database_metadata = nil)
-        super(config_or_deprecated_connection, logger, connection_options, config)
+      def initialize(config_or_deprecated_connection, deprecated_logger = nil, deprecated_connection_options = nil, deprecated_config = nil, database_metadata = nil)
+        super(config_or_deprecated_connection, deprecated_logger, deprecated_connection_options, deprecated_config)
 
         if config_or_deprecated_connection.try(:get_info, ODBC.const_get("SQL_DBMS_NAME"))
           # On Rails 7.1 `config_or_deprecated_connection` will be connection that is setup above, in this file,
           # in `ActiveRecord::Base.odbc_connection`.
+
           @raw_connection = config_or_deprecated_connection
-          @config = connection_options
-          @database_metadata = database_metadata
+          @config = deprecated_config
           configure_time_options(@raw_connection)
         else
           # On Rails 7.2, ActiveRecord will instantiate this class and pass the connection string in
@@ -79,9 +79,9 @@ module ActiveRecord
           #   @raw_connection = setup.connection
           #   configure_time_options(@raw_connection)
           connect
-
-          @database_metadata = ::ODBCAdapter::DatabaseMetadata.new(@raw_connection, @config[:encoding_bug])
         end
+
+        @database_metadata = ::ODBCAdapter::DatabaseMetadata.new(@raw_connection)
       end
 
       # Returns the human-readable name of the adapter.
