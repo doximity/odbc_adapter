@@ -13,7 +13,8 @@ module ODBCAdapter
       table_names = []
       db_regex = name_regex(current_database)
       schema_regex = name_regex(current_schema)
-      stmt = @raw_connection.prepare("SHOW TABLES IN ACCOUNT")
+
+      stmt = @raw_connection.prepare("SHOW TABLES IN SCHEMA #{current_database}.#{current_schema}")
 
       stmt.execute.each_hash do |row|
         next unless row["database_name"] =~ db_regex && row["schema_name"] =~ schema_regex
