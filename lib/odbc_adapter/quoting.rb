@@ -5,6 +5,11 @@ module ODBCAdapter
       string.gsub(/\'/, "''")
     end
 
+    # Returns a quoted form of the table name.
+    def quote_table_name(name)
+      quote_column_name(name)
+    end
+
     # Returns a quoted form of the column name.
     def quote_column_name(name)
       name = name.to_s

@@ -25,7 +25,7 @@ module ODBCAdapter
       id_value
     end
 
-    def internal_exec_query(sql, name = 'SQL', binds = [], prepare: false) # rubocop:disable Lint/UnusedMethodArgument
+    def internal_exec_query(sql, name = 'SQL', binds = [], prepare: false, allow_retry: false) # rubocop:disable Lint/UnusedMethodArgument
       sql = transform_query(sql)
       log(sql, name) do
         sql = bind_params(binds, sql) if prepared_statements
