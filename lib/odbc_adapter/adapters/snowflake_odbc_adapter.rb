@@ -26,6 +26,17 @@ module ODBCAdapter
       def supports_migrations?
         false
       end
+
+      # Override the schema fetching methods for tables and views to return empty arrays as
+      # they make very expensive calls to Snowflake and are not needed for the adapter to
+      # function for our use cases.
+      def tables(*args)
+        []
+      end
+
+      def views(*args)
+        []
+      end
     end
   end
 end
