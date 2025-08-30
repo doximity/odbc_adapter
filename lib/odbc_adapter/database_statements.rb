@@ -8,6 +8,9 @@ module ODBCAdapter
     # Executes the SQL statement in the context of this connection.
     # Returns the number of rows affected.
     def execute(sql, name = nil, binds = [])
+      # Rails 8.0 removed the `transform_query` method in favor of handling transformations via
+      # the `preprocess_query` method. This ensures that query transformations run as expected
+      # for both pre and post Rails 8 apps. For more context, see https://github.com/rails/rails/pull/52428
       sql = respond_to?(:preprocess_query, true) ? preprocess_query(sql) : transform_query(sql)
 
       log(sql, name) do
@@ -27,6 +30,9 @@ module ODBCAdapter
     end
 
     def internal_exec_query(sql, name = 'SQL', binds = [], prepare: false, allow_retry: false) # rubocop:disable Lint/UnusedMethodArgument
+      # Rails 8.0 removed the `transform_query` method in favor of handling transformations via
+      # the `preprocess_query` method. This ensures that query transformations run as expected
+      # for both pre and post Rails 8 apps. For more context, see https://github.com/rails/rails/pull/52428
       sql = respond_to?(:preprocess_query, true) ? preprocess_query(sql) : transform_query(sql)
 
       log(sql, name) do
