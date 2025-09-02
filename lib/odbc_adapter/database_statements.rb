@@ -8,7 +8,7 @@ module ODBCAdapter
     # Executes the SQL statement in the context of this connection.
     # Returns the number of rows affected.
     def execute(sql, name = nil, binds = [])
-      sql = transform_query(sql)
+      sql = handle_query_preprocessing(sql)
       log(sql, name) do
         sql = bind_params(binds, sql) if prepared_statements
         @raw_connection.do(sql)
@@ -26,7 +26,7 @@ module ODBCAdapter
     end
 
     def internal_exec_query(sql, name = 'SQL', binds = [], prepare: false, allow_retry: false) # rubocop:disable Lint/UnusedMethodArgument
-      sql = transform_query(sql)
+      sql = handle_query_preprocessing(sql)
       log(sql, name) do
         sql = bind_params(binds, sql) if prepared_statements
         stmt =  @raw_connection.run(sql)
@@ -197,6 +197,13 @@ module ODBCAdapter
 
     def prepared_binds(binds)
       binds.map(&:value_for_database).map { |bind| _type_cast(bind) }
+    end
+
+    # As of Rails 8, query transformations are handled by `#preprocess_query`.
+    # This ensures the correct preprocessing method is called, falling back to
+    # pre-Rails 8 behavior. For more context, see https://github.com/rails/rails/pull/52428
+    def handle_query_preprocessing(sql)
+      respond_to?(:preprocess_query, true) ? preprocess_query(sql) : transform_query(sql)
     end
   end
 end
