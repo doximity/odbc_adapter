@@ -150,7 +150,7 @@ module ODBCAdapter
         new_column_args << sql_type_metadata
         new_column_args << col_nullable
 
-        cols << new_column(
+        cols << ::ODBCAdapter::Column.new(
           *new_column_args,
           native_type: col_native_type,
           auto_incremented: auto_incremented
