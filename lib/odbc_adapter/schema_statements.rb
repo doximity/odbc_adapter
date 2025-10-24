@@ -143,7 +143,18 @@ module ODBCAdapter
 
         sql_type_metadata = ActiveRecord::ConnectionAdapters::SqlTypeMetadata.new(**args)
 
-        cols << new_column(format_case(col_name), lookup_cast_type_from_column(sql_type_metadata), col_default, sql_type_metadata, col_nullable, col_native_type, auto_incremented)
+        new_column_args = []
+        new_column_args << format_case(col_name)
+        new_column_args << lookup_cast_type_from_column(sql_type_metadata) if ActiveRecord.version >= "8.1.0"
+        new_column_args << col_default
+        new_column_args << sql_type_metadata
+        new_column_args << col_nullable
+
+        cols << new_column(
+          *new_column_args,
+          native_type: col_native_type,
+          auto_incremented: auto_incremented
+        )
       end
     end
 
