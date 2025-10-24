@@ -5,6 +5,16 @@ module ODBCAdapter
     SQL_NULLABLE = 1
     SQL_NULLABLE_UNKNOWN = 2
 
+    READ_QUERY = ActiveRecord::ConnectionAdapters::AbstractAdapter.build_read_query_regexp(
+      :close, :declare, :fetch, :set, :show
+    )
+
+    def write_query?(sql)
+      !READ_QUERY.match?(sql)
+    rescue ArgumentError # Invalid encoding
+      !READ_QUERY.match?(sql.b)
+    end
+
     # Executes the SQL statement in the context of this connection.
     # Returns the number of rows affected.
     def execute(sql, name = nil, binds = [])
