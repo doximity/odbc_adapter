@@ -137,8 +137,8 @@ module ActiveRecord
       # Build a new column object from the given options. Effectively the same
       # as super except that it also passes in the native type.
       # rubocop:disable Metrics/ParameterLists
-      def new_column(name, default, sql_type_metadata, null, native_type = nil, auto_incremented = false)
-        ::ODBCAdapter::Column.new(name, default, sql_type_metadata, null, native_type, auto_incremented)
+      def new_column(name, cast_type, default, sql_type_metadata, null, native_type = nil, auto_incremented = false)
+        ::ODBCAdapter::Column.new(name, cast_type, default, sql_type_metadata, null, native_type, auto_incremented)
       end
 
       #Snowflake doesn't have a mechanism to return the primary key on inserts, it needs prefetched
