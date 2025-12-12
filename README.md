@@ -70,6 +70,59 @@ docker run -it --rm -v $(pwd):/workspace -v /tmp/mysql:/var/lib/mysql odbc-dev:l
 docker/test.sh
 ```
 
+## Releasing a New Version
+
+To release a new version of the gem, follow these steps:
+
+1. **Create a release branch**:
+   ```bash
+   git checkout -b release/vX.Y.Z
+   ```
+
+2. **Update the version number**:
+   - Edit `lib/odbc_adapter/version.rb` and update the `VERSION` constant
+
+3. **Update the CHANGELOG**:
+   - Edit `CHANGELOG.md` to document all changes in this release
+   - Update the release date for the version (use format `YYYY-MM-DD`)
+   - Move any items from `[Unreleased]` to the new version section
+   - Follow [Keep a Changelog](https://keepachangelog.com/) format
+
+4. **Commit your changes**:
+   ```bash
+   git add lib/odbc_adapter/version.rb CHANGELOG.md
+   git commit -m "Bump version to X.Y.Z"
+   ```
+
+5. **Push the branch and create a pull request**:
+   ```bash
+   git push origin release/vX.Y.Z
+   ```
+   - Create a PR to merge into `master`
+   - Get it reviewed and approved
+
+6. **After the PR is merged, tag the release**:
+   ```bash
+   git checkout master
+   git pull
+   git tag -a vX.Y.Z -m "Release version X.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+7. **Build and publish the gem**:
+   ```bash
+   gem build odbc_adapter.gemspec
+   gem push odbc_adapter-X.Y.Z.gem
+   ```
+
+8. **Create a GitHub release**:
+   - Go to the [Releases page](https://github.com/doximity/odbc_adapter/releases)
+   - Click "Draft a new release"
+   - Select the tag you just created
+   - Use the version number as the release title (e.g., `v7.0.0`)
+   - Copy the relevant section from CHANGELOG.md into the release notes
+   - Publish the release
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/localytics/odbc_adapter.
