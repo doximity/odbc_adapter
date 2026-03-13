@@ -39,4 +39,58 @@ class PostgreSQLAdapterTest < Minitest::Test
       ActiveRecord::ConnectionAdapters::ODBCAdapter
     )
   end
+
+  # --- distinct ---
+
+  def test_distinct_with_no_orders_returns_simple_distinct
+    assert_equal 'DISTINCT posts.id', adapter.distinct('posts.id', [])
+  end
+
+  def test_distinct_strips_asc_modifier
+    result = adapter.distinct('id', ['created_at DESC'])
+    assert_includes result, 'created_at AS alias_0'
+    refute_includes result, 'DESC'
+  end
+
+  def test_distinct_strips_asc_and_nulls_first
+    result = adapter.distinct('id', ['name ASC NULLS FIRST'])
+    refute_includes result, 'ASC'
+    refute_includes result, 'NULLS'
+  end
+
+  def test_distinct_with_multiple_orders_generates_aliases
+    result = adapter.distinct('id', ['col1 ASC', 'col2 DESC'])
+    assert_includes result, 'alias_0'
+    assert_includes result, 'alias_1'
+  end
+
+  # --- table_filtered? ---
+
+  def test_table_filtered_rejects_information_schema
+    assert adapter.table_filtered?('information_schema', 'TABLE')
+  end
+
+  def test_table_filtered_rejects_pg_catalog
+    assert adapter.table_filtered?('pg_catalog', 'VIEW')
+  end
+
+  def test_table_filtered_rejects_non_table_type
+    assert adapter.table_filtered?('public', 'INDEX')
+  end
+
+  def test_table_filtered_allows_regular_table
+    refute adapter.table_filtered?('public', 'TABLE')
+  end
+
+  def test_table_filtered_allows_base_table
+    refute adapter.table_filtered?('app_schema', 'BASE TABLE')
+  end
+
+  # --- type_cast ---
+
+  def test_type_cast_bytea_string_wraps_in_format_hash
+    col    = Struct.new(:native_type).new('bytea')
+    result = adapter.type_cast('hello', col)
+    assert_equal({ value: 'hello', format: 1 }, result)
+  end
 end

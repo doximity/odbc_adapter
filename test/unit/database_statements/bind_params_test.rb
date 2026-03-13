@@ -15,6 +15,10 @@ class BindParamsHost
     bind_params(binds, sql)
   end
 
+  def sub(sql)
+    prepare_statement_sub(sql)
+  end
+
   private
 
   # Override prepared_binds to return the values as-is for test simplicity
@@ -57,5 +61,19 @@ class BindParamsTest < Minitest::Test
     sql    = 'SELECT * FROM t WHERE x = $1'
     result = host.bind([nil], sql)
     assert_equal "SELECT * FROM t WHERE x = ''", result
+  end
+
+  # --- prepare_statement_sub ---
+
+  def test_prepare_statement_sub_replaces_dollar_params_with_question_marks
+    assert_equal 'SELECT ?, ?', host.sub('SELECT $1, $2')
+  end
+
+  def test_prepare_statement_sub_handles_multi_digit_params
+    assert_equal '?', host.sub('$10')
+  end
+
+  def test_prepare_statement_sub_no_params_unchanged
+    assert_equal 'SELECT 1', host.sub('SELECT 1')
   end
 end

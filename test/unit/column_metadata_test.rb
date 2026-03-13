@@ -88,4 +88,63 @@ class ColumnMetadataTest < Minitest::Test
     assert result.key?(:primary_key)
     assert_equal 'INT PRIMARY KEY NOT NULL AUTOINCREMENT', result[:primary_key]
   end
+
+  # --- additional type mappings ---
+
+  def test_native_database_types_maps_float
+    rows = [['DOUBLE', ODBC::SQL_DOUBLE, 15, nil, nil, nil]]
+    metadata = ODBCAdapter::ColumnMetadata.new(make_adapter(rows))
+    result = metadata.native_database_types
+
+    assert result.key?(:float), 'Expected :float in native_database_types'
+    assert_equal 'DOUBLE', result[:float][:name]
+  end
+
+  def test_native_database_types_maps_datetime
+    rows = [['TIMESTAMP', ODBC::SQL_TYPE_TIMESTAMP, 26, nil, nil, nil]]
+    metadata = ODBCAdapter::ColumnMetadata.new(make_adapter(rows))
+    result = metadata.native_database_types
+
+    assert result.key?(:datetime), 'Expected :datetime in native_database_types'
+    assert_equal 'TIMESTAMP', result[:datetime][:name]
+  end
+
+  def test_native_database_types_maps_timestamp
+    rows = [['TIMESTAMP', ODBC::SQL_TYPE_TIMESTAMP, 26, nil, nil, nil]]
+    metadata = ODBCAdapter::ColumnMetadata.new(make_adapter(rows))
+    result = metadata.native_database_types
+
+    assert result.key?(:timestamp), 'Expected :timestamp in native_database_types'
+    assert_equal 'TIMESTAMP', result[:timestamp][:name]
+  end
+
+  def test_native_database_types_maps_time
+    rows = [['TIME', ODBC::SQL_TYPE_TIME, 8, nil, nil, nil]]
+    metadata = ODBCAdapter::ColumnMetadata.new(make_adapter(rows))
+    result = metadata.native_database_types
+
+    assert result.key?(:time), 'Expected :time in native_database_types'
+    assert_equal 'TIME', result[:time][:name]
+  end
+
+  def test_native_database_types_maps_date
+    rows = [['DATE', ODBC::SQL_TYPE_DATE, 10, nil, nil, nil]]
+    metadata = ODBCAdapter::ColumnMetadata.new(make_adapter(rows))
+    result = metadata.native_database_types
+
+    assert result.key?(:date), 'Expected :date in native_database_types'
+    assert_equal 'DATE', result[:date][:name]
+  end
+
+  def test_native_database_types_binary_picks_largest_capacity
+    rows = [
+      ['LONGVARBINARY', ODBC::SQL_LONGVARBINARY, 2_147_483_647, nil, nil, nil],
+      ['VARBINARY',     ODBC::SQL_VARBINARY,     8_000, nil, nil, nil]
+    ]
+    metadata = ODBCAdapter::ColumnMetadata.new(make_adapter(rows))
+    result = metadata.native_database_types
+
+    assert result.key?(:binary), 'Expected :binary in native_database_types'
+    assert_equal 'LONGVARBINARY', result[:binary][:name]
+  end
 end

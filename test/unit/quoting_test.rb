@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'unit_test_helper'
+require 'active_support/core_ext/date_time'
 require 'odbc_adapter/type/internal/snowflake_variant'
 require 'odbc_adapter/quoting'
 
@@ -142,5 +143,27 @@ class QuotingTest < Minitest::Test
 
   def test_quote_integer_via_super
     assert_equal '42', host.quote(42)
+  end
+
+  # --- quoted_date ---
+
+  def test_quoted_date_formats_date
+    assert_equal '2024-03-15', host.quoted_date(Date.new(2024, 3, 15))
+  end
+
+  def test_quoted_date_formats_time_as_datetime_string
+    original_timezone = ActiveRecord.default_timezone
+    ActiveRecord.default_timezone = :utc
+    begin
+      result = host.quoted_date(Time.utc(2024, 3, 15, 10, 30, 45))
+      assert_equal '2024-03-15 10:30:45', result
+    ensure
+      ActiveRecord.default_timezone = original_timezone
+    end
+  end
+
+  def test_quoted_date_formats_datetime
+    result = host.quoted_date(DateTime.new(2024, 3, 15, 10, 30, 45))
+    assert_match(/2024-03-15 10:30:45/, result)
   end
 end
