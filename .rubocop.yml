@@ -1,7 +1,7 @@
 AllCops:
   DisplayCopNames: true
   DisplayStyleGuide: true
-  TargetRubyVersion: 2.2
+  TargetRubyVersion: 3.4
   Exclude:
   - 'vendor/**/*'
 
@@ -20,7 +20,7 @@ Metrics/CyclomaticComplexity:
 Metrics/MethodLength:
   Enabled: false
 
-Metrics/LineLength:
+Layout/LineLength:
   Enabled: false
 
 Metrics/PerceivedComplexity:

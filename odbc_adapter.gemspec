@@ -24,9 +24,10 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency 'bundler', '>= 1.14'
   spec.add_development_dependency 'minitest', '~> 5.10'
-  spec.add_development_dependency 'rake', '~> 12.0'
-  spec.add_development_dependency 'rubocop', '0.48.1'
+  spec.add_development_dependency 'rake', '>= 12.0'
+  spec.add_development_dependency 'rubocop', '>= 0.48.1'
   spec.add_development_dependency 'simplecov', '~> 0.14'
+  spec.add_development_dependency 'ostruct'
   spec.add_development_dependency 'pry', '~> 0.11.1'
 
   spec.post_install_message = <<~MESSAGE
