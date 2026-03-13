@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'unit_test_helper'
 require 'odbc_adapter/type/internal/snowflake_variant'
 require 'odbc_adapter/type/variant'

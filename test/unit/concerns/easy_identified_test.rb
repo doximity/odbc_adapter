@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'unit_test_helper'
 require 'odbc_adapter/concerns/easy_identified'
 
@@ -26,13 +28,9 @@ class MockEasyIdentifiedModel
   end
 
   include ODBCAdapter::EasyIdentified
-
-  private
-
-  # Override the DB-calling retrieve_id with a predictable stub.
-  # Defined AFTER include so it overwrites the version added by the concern.
-  # The "method redefined" warning is expected and intentional.
-  def retrieve_id = 42
+  # Prepend overrides retrieve_id without triggering a "method redefined" warning
+  # because the method lives in a separate module, not the class itself.
+  prepend(Module.new { def retrieve_id = 42 })
 end
 
 class EasyIdentifiedTest < Minitest::Test

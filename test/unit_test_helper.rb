@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'simplecov'
 SimpleCov.start do
   command_name 'Unit Tests'
@@ -94,8 +96,8 @@ module ActiveRecord
     class ODBCAdapter < AbstractAdapter
       attr_reader :database_metadata
 
-      def initialize(*_args)
-        # Skip the real connection setup
+      def initialize(*_args) # rubocop:disable Lint/MissingSuper
+        # Skip the real connection setup — calling super requires a live connection
       end
 
       def supports_migrations?

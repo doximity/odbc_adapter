@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'unit_test_helper'
 require 'odbc_adapter/database_statements'
 
@@ -10,7 +12,7 @@ class CaseFormattingHost
 
   def database_metadata
     upcase = @upcase
-    @meta ||= Struct.new(:upcase_identifiers?).new(upcase)
+    @database_metadata ||= Struct.new(:upcase_identifiers?).new(upcase)
   end
 
   def prepared_statements = false

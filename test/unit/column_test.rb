@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'unit_test_helper'
 require 'odbc_adapter/column'
 
@@ -6,17 +8,15 @@ class ColumnTest < Minitest::Test
   # AR <8.1:           (name, default, sql_type_metadata, nullable, **)
   # Deduplicable caches by (name, cast_type, default, sql_type_metadata, null) so
   # each test uses a unique name to avoid cross-test cache collisions.
-  def build_column(name:, default: nil, native_type: nil, auto_incremented: false,
-                   sql_type: 'integer', ar_type: ActiveRecord::Type::Integer.new)
+  def build_column(name:, default: nil, sql_type: 'integer',
+                   ar_type: ActiveRecord::Type::Integer.new, **col_opts)
     meta = ActiveRecord::ConnectionAdapters::SqlTypeMetadata.new(
       sql_type: sql_type, type: :integer, limit: nil, precision: nil, scale: nil
     )
     if ActiveRecord.version >= '8.1.0'
-      ODBCAdapter::Column.new(name, ar_type, default, meta, true,
-                              native_type: native_type, auto_incremented: auto_incremented)
+      ODBCAdapter::Column.new(name, ar_type, default, meta, true, **col_opts)
     else
-      ODBCAdapter::Column.new(name, default, meta, true,
-                              native_type: native_type, auto_incremented: auto_incremented)
+      ODBCAdapter::Column.new(name, default, meta, true, **col_opts)
     end
   end
 
