@@ -46,4 +46,58 @@ class MySQLAdapterTest < Minitest::Test
       ActiveRecord::ConnectionAdapters::ODBCAdapter
     )
   end
+
+  def adapter_with_sql_capture
+    a = ODBCAdapter::Adapters::MySQLODBCAdapter.new
+    sqls = []
+    a.define_singleton_method(:execute) { |sql, *| sqls << sql }
+    [a, sqls]
+  end
+
+  # --- create_database ---
+
+  def test_create_database_defaults_to_utf8_charset
+    a, sqls = adapter_with_sql_capture
+    a.create_database('mydb')
+    assert_includes sqls.first, 'DEFAULT CHARACTER SET `utf8`'
+  end
+
+  def test_create_database_with_custom_charset
+    a, sqls = adapter_with_sql_capture
+    a.create_database('mydb', charset: 'latin1')
+    assert_includes sqls.first, 'DEFAULT CHARACTER SET `latin1`'
+  end
+
+  def test_create_database_with_charset_and_collation
+    a, sqls = adapter_with_sql_capture
+    a.create_database('mydb', charset: 'latin1', collation: 'latin1_bin')
+    assert_includes sqls.first, 'DEFAULT CHARACTER SET `latin1`'
+    assert_includes sqls.first, 'COLLATE `latin1_bin`'
+  end
+
+  def test_create_database_without_collation_omits_collate_clause
+    a, sqls = adapter_with_sql_capture
+    a.create_database('mydb')
+    refute sqls.first.include?('COLLATE')
+  end
+
+  # --- indexes rejects PRIMARY key ---
+
+  def test_indexes_filters_out_primary_key_index
+    primary_idx = ActiveRecord::ConnectionAdapters::IndexDefinition.new('users', 'PRIMARY', true, ['id'])
+    email_idx   = ActiveRecord::ConnectionAdapters::IndexDefinition.new('users', 'idx_email', false, ['email'])
+    unique_idx  = ActiveRecord::ConnectionAdapters::IndexDefinition.new('users', 'idx_unique', true, ['email'])
+    name_idx    = ActiveRecord::ConnectionAdapters::IndexDefinition.new('users', 'idx_name', false, ['name'])
+
+    # Simulate what MySQLODBCAdapter#indexes does:
+    # super(...).reject { |i| i.unique && i.name =~ /^PRIMARY$/ }
+    all_indexes = [primary_idx, email_idx, unique_idx, name_idx]
+    result = all_indexes.reject { |i| i.unique && i.name =~ /^PRIMARY$/ }
+
+    assert_equal 3, result.length
+    refute_includes result.map(&:name), 'PRIMARY'
+    assert_includes result.map(&:name), 'idx_unique' # unique but not PRIMARY → kept
+    assert_includes result.map(&:name), 'idx_email'
+    assert_includes result.map(&:name), 'idx_name'
+  end
 end

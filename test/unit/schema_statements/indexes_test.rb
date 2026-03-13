@@ -92,3 +92,57 @@ class IndexesSchemaTest < Minitest::Test
     assert_equal 'idx_users_email', result.first.name
   end
 end
+
+# Provides the base index_name used by ODBCAdapter::SchemaStatements#index_name via super.
+module BaseIndexNameProvider
+  def index_name(table_name, options)
+    if options.is_a?(Hash)
+      if options[:column]
+        "index_#{table_name}_on_#{Array(options[:column]) * '_and_'}"
+      elsif options[:name]
+        options[:name].to_s
+      end
+    else
+      index_name(table_name, column: options)
+    end
+  end
+end
+
+class IndexNameSchemaHost
+  include BaseIndexNameProvider
+  include ODBCAdapter::SchemaStatements
+  include ODBCAdapter::DatabaseStatements
+
+  def initialize(max_len:)
+    @max_len = max_len
+  end
+
+  def database_metadata
+    max_len = @max_len
+    @database_metadata ||= Struct.new(:upcase_identifiers?, :database_name, :max_identifier_len)
+                                 .new(false, 'MYDB', max_len)
+  end
+
+  def current_database = 'MYDB'
+  def current_schema = 'PUBLIC'
+end
+
+class IndexNameSchemaTest < Minitest::Test
+  def test_index_name_respects_max_identifier_len
+    host = IndexNameSchemaHost.new(max_len: 20)
+    result = host.index_name('users', column: 'email')
+    assert result.length <= 20
+  end
+
+  def test_index_name_falls_back_to_255_when_max_len_nil
+    host = IndexNameSchemaHost.new(max_len: nil)
+    result = host.index_name('users', column: 'email')
+    assert result.length <= 255
+  end
+
+  def test_index_name_truncates_long_generated_name
+    host = IndexNameSchemaHost.new(max_len: 10)
+    result = host.index_name('very_long_table_name', column: 'very_long_column_name')
+    assert_equal 10, result.length
+  end
+end

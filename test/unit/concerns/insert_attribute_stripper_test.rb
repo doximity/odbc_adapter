@@ -129,4 +129,33 @@ class InsertAttributeStripperTest < Minitest::Test
     assert_equal false, result
     assert_equal 1, m.save_count
   end
+
+  # --- save! path ---
+
+  def test_save_bang_strips_and_restores_like_save
+    m = new_model_with_variant_column
+    m.save!
+    assert_equal 2, m.save_count
+    assert_equal({ 'k' => 1 }, m.attributes['data'])
+  end
+
+  # --- nil variant value not stripped ---
+
+  def test_nil_variant_value_is_not_stripped
+    MockStrippableModel.columns = [StubColumnForStripper.new('data', :variant)]
+    m = MockStrippableModel.new(is_new: true, valid: true)
+    m.attributes = { 'data' => nil }
+    m.save
+    assert_equal 1, m.save_count
+  end
+
+  # --- validate:false bypasses early return ---
+
+  def test_validate_false_on_invalid_record_proceeds_with_strip_and_save
+    MockStrippableModel.columns = [StubColumnForStripper.new('data', :variant)]
+    m = MockStrippableModel.new(is_new: true, valid: false)
+    m.attributes = { 'data' => { 'k' => 1 } }
+    m.save(validate: false)
+    assert_equal 2, m.save_count
+  end
 end

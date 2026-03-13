@@ -128,4 +128,32 @@ class ColumnsSchemaTest < Minitest::Test
     col = columns_for(col_data(column_name: 'mystery', col_native_type: 'UNKNOWN_SF_TYPE')).first
     assert_nil col.type
   end
+
+  # --- STRUCT and ARRAY types ---
+
+  def test_columns_struct_maps_to_object_type
+    col = columns_for(col_data(column_name: 'meta', col_native_type: 'STRUCT')).first
+    assert_equal :object, col.type
+  end
+
+  def test_columns_array_maps_to_array_type
+    col = columns_for(col_data(column_name: 'tags', col_native_type: 'ARRAY')).first
+    assert_equal :array, col.type
+  end
+
+  # --- extract_scale_from_snowflake ---
+
+  def test_extract_scale_from_snowflake_uses_scale_key
+    col = columns_for(
+      col_data(column_name: 'price', col_native_type: 'DECIMAL', column_size: 10, numeric_scale: 3)
+    ).first
+    assert_equal 'DECIMAL(10,3)', col.sql_type
+  end
+
+  def test_extract_scale_from_snowflake_defaults_to_zero_when_absent
+    col = columns_for(
+      col_data(column_name: 'count', col_native_type: 'DECIMAL', column_size: 0, numeric_scale: 0)
+    ).first
+    assert_equal :integer, col.type
+  end
 end

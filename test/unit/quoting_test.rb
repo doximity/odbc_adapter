@@ -166,4 +166,15 @@ class QuotingTest < Minitest::Test
     result = host.quoted_date(DateTime.new(2024, 3, 15, 10, 30, 45))
     assert_match(/2024-03-15 10:30:45/, result)
   end
+
+  def test_quoted_date_formats_time_in_local_timezone
+    original_timezone = ActiveRecord.default_timezone
+    ActiveRecord.default_timezone = :local
+    begin
+      result = host.quoted_date(Time.local(2024, 3, 15, 10, 30, 45))
+      assert_equal '2024-03-15 10:30:45', result
+    ensure
+      ActiveRecord.default_timezone = original_timezone
+    end
+  end
 end

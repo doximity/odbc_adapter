@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'unit_test_helper'
+require 'active_support/core_ext/hash/reverse_merge'
 require 'odbc_adapter/adapters/postgresql_odbc_adapter'
 
 class PostgreSQLAdapterTest < Minitest::Test
@@ -92,5 +93,98 @@ class PostgreSQLAdapterTest < Minitest::Test
     col    = Struct.new(:native_type).new('bytea')
     result = adapter.type_cast('hello', col)
     assert_equal({ value: 'hello', format: 1 }, result)
+  end
+
+  # --- create_database ---
+
+  def test_create_database_defaults_to_utf8_encoding
+    a, sqls = pg_adapter_with_sql_capture
+    a.create_database('mydb')
+    assert_match(/ENCODING = 'utf8'/, sqls.first)
+  end
+
+  def test_create_database_with_owner
+    a, sqls = pg_adapter_with_sql_capture
+    a.create_database('mydb', owner: 'dbowner')
+    assert_match(/OWNER = "dbowner"/, sqls.first)
+  end
+
+  def test_create_database_with_template
+    a, sqls = pg_adapter_with_sql_capture
+    a.create_database('mydb', template: 'template0')
+    assert_match(/TEMPLATE = "template0"/, sqls.first)
+  end
+
+  def test_create_database_with_custom_encoding
+    a, sqls = pg_adapter_with_sql_capture
+    a.create_database('mydb', encoding: 'latin1')
+    assert_match(/ENCODING = 'latin1'/, sqls.first)
+  end
+
+  def test_create_database_with_tablespace
+    a, sqls = pg_adapter_with_sql_capture
+    a.create_database('mydb', tablespace: 'pg_default')
+    assert_match(/TABLESPACE = "pg_default"/, sqls.first)
+  end
+
+  def test_create_database_with_connection_limit
+    a, sqls = pg_adapter_with_sql_capture
+    a.create_database('mydb', connection_limit: 10)
+    assert_match(/CONNECTION LIMIT = 10/, sqls.first)
+  end
+
+  def test_create_database_unknown_option_ignored
+    a, sqls = pg_adapter_with_sql_capture
+    a.create_database('mydb', unknown_key: 'val')
+    refute_match(/unknown_key/, sqls.first)
+  end
+
+  # --- insert_sql ---
+
+  def test_insert_sql_appends_returning_clause_when_pk_known
+    a, selected = pg_adapter_for_insert_sql(pk_col: 'id')
+    a.send(:insert_sql, 'INSERT INTO users (name) VALUES (?)', nil, nil)
+    assert_match(/RETURNING "id"/, selected.first)
+  end
+
+  def test_insert_sql_uses_pk_when_provided_directly
+    a = ODBCAdapter::Adapters::PostgreSQLODBCAdapter.new
+    selected = []
+    a.define_singleton_method(:select_value) do |sql, *|
+      selected << sql
+      1
+    end
+    a.define_singleton_method(:quote_column_name) { |col| "\"#{col}\"" }
+    a.send(:insert_sql, 'INSERT INTO users VALUES (?)', nil, 'user_id')
+    assert_match(/RETURNING "user_id"/, selected.first)
+  end
+
+  def test_insert_sql_select_value_returns_result
+    a, _selected = pg_adapter_for_insert_sql(pk_col: 'id')
+    result = a.send(:insert_sql, 'INSERT INTO users (name) VALUES (?)', nil, nil)
+    assert_equal 42, result
+  end
+
+  private
+
+  def pg_adapter_with_sql_capture
+    a = ODBCAdapter::Adapters::PostgreSQLODBCAdapter.new
+    sqls = []
+    a.define_singleton_method(:execute) { |sql, *| sqls << sql }
+    a.define_singleton_method(:quote_table_name) { |name| name }
+    [a, sqls]
+  end
+
+  def pg_adapter_for_insert_sql(pk_col:)
+    a = ODBCAdapter::Adapters::PostgreSQLODBCAdapter.new
+    a.define_singleton_method(:extract_table_ref_from_insert_sql) { |_sql| 'users' }
+    a.define_singleton_method(:primary_key) { |_table| pk_col }
+    a.define_singleton_method(:quote_column_name) { |col| "\"#{col}\"" }
+    selected = []
+    a.define_singleton_method(:select_value) do |sql, *|
+      selected << sql
+      42
+    end
+    [a, selected]
   end
 end
