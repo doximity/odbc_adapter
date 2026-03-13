@@ -72,7 +72,7 @@ module ODBCAdapter
       def create_database(name, options = {})
         options = options.reverse_merge(encoding: 'utf8')
 
-        option_string = options.symbolize_keys.sum do |key, value|
+        option_string = options.symbolize_keys.sum('') do |key, value|
           case key
           when :owner
             " OWNER = \"#{value}\""

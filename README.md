@@ -49,20 +49,36 @@ ActiveRecord models that use this connection will now be connecting to the confi
 
 ## Testing
 
-To run the tests, you'll need the ODBC driver as well as the connection adapter for each database against which you're trying to test. Then run `DSN=MyDatabaseDSN bundle exec rake test` and the test suite will be run by connecting to your database.
+There are two test suites:
 
-## Testing Using a Docker Container Because ODBC on Mac is Hard
+### Unit tests (no database required)
 
-Tested on Sierra.
+```bash
+bundle exec rake test:unit
+```
 
+Tests the type system, quoting, SQL generation, schema statement helpers, connection setup, adapter subclasses, and concerns without any database connection. Safe to run anywhere.
 
-Run from project root:
+### Integration tests (requires ODBC connection)
+
+```bash
+DSN=MyDatabaseDSN bundle exec rake test
+```
+
+Full integration tests against a live database via ODBC. You'll need the ODBC driver and a connection adapter for the target database.
+
+### Run both
+
+```bash
+bundle exec rake test:all
+```
+
+### Testing Using a Docker Container (legacy)
 
 ```
 bundle package
 docker build -f Dockerfile.dev -t odbc-dev .
 
-# Local mount mysql directory to avoid some permissions problems
 mkdir -p /tmp/mysql
 docker run -it --rm -v $(pwd):/workspace -v /tmp/mysql:/var/lib/mysql odbc-dev:latest
 
